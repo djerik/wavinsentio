@@ -23,11 +23,12 @@ setup(
     author_email="djerik@gmail.com",
 
     description="API Wrapper for Wavin Sentio underfloor heating system",
-    long_description=read("README.rst"),
+    long_description=read("README.md"),
+    long_description_content_type="text/markdown",
 
     packages=find_packages(exclude=('tests',)),
 
-    install_requires=[requests],
+    install_requires=['requests'],
 
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
