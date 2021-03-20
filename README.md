@@ -1,11 +1,7 @@
 # Wavin Sentio
 > API Wrapper for Wavin Sentio underfloor heating system.
 
-[![NPM Version][npm-image]][npm-url]
-[![Build Status][travis-image]][travis-url]
-[![Downloads Stats][npm-downloads]][npm-url]
-
-Query status of thermostats and change target temperature
+Enables you to query status of thermostats and change target temperature
 
 ## Usage example
 
