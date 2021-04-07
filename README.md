@@ -11,3 +11,5 @@ ws = wavinsentio.WavinSentio("username","password")
 
 * 0.1.0
     * The first proper release
+* 0.2.0
+    * Added setTemperature, setProfile and refresh token logic
