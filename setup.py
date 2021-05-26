@@ -15,7 +15,7 @@ def read(filename):
 
 setup(
     name="wavinsentio",
-    version="0.2.0",
+    version="0.2.2",
     url="https://github.com/djerik/wavinsentio",
     license='MIT',
 
