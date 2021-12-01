@@ -13,3 +13,9 @@ ws = wavinsentio.WavinSentio("username","password")
     * The first proper release
 * 0.2.0
     * Added setTemperature, setProfile and refresh token logic
+* 0.2.1
+    * PyPi push
+* 0.2.2
+    * Cleaned folder structure
+* 0.2.3
+    * Fixed error handling

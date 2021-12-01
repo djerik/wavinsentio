@@ -2,7 +2,7 @@ import requests
 import time
 
 __title__ = "wavinsentio"
-__version__ = "0.0.1"
+__version__ = "0.2.3"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
@@ -43,10 +43,12 @@ class WavinSentio():
         post_data = {"username":self.username,"password":self.password,"grant_type":"password"}
         response = requests.post( urljoin( BASEURL, "oauth" ,"token" ),data=post_data
                                 ,headers={"Authorization": 'Basic YXBwOnNlY3JldA==','Content-Type':'application/x-www-form-urlencoded'})
-    
+                        
+        if response.status_code == 401:
+            raise UnauthorizedException( 'Wrong login' )
         if response.status_code != 200:
-        # This means something went wrong.
-            raise ApiError('GET /tasks/ {}'.format(resp.status_code))
+            # This means something else went wrong.
+            raise Exception('Error during login {}'.format(response.text))
         
         data = response.json()
 
@@ -71,9 +73,6 @@ class WavinSentio():
         url = urljoin(BASEURL, endpoint )
 
         response = requests.patch(url, json=payload, headers={"Authorization" : self.token_type + " " + self.access_token,'Content-Type':'application/json'})
-        if response.status_code != 200:
-        # This means something went wrong.
-            raise ApiError('GET /tasks/ {}'.format(resp.status_code))
         
         data = response.json()
     
@@ -102,4 +101,5 @@ def urljoin(*parts):
     url = '/'.join(part_list)
     return url
 
-
+class UnauthorizedException(Exception):
+    pass
