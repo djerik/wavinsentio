@@ -19,3 +19,5 @@ ws = wavinsentio.WavinSentio("username","password")
     * Cleaned folder structure
 * 0.2.3
     * Fixed error handling
+* 0.3.0
+    * Added get_location including outdoor temperature
