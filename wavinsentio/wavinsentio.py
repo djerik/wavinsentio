@@ -2,7 +2,7 @@ import requests
 import time
 
 __title__ = "wavinsentio"
-__version__ = "0.2.3"
+__version__ = "0.3.0"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
@@ -22,6 +22,10 @@ class WavinSentio():
  
     def get_locations(self):           
         return self.__request("locations", "")
+    
+    def get_location(self,ulc):
+        endpoint = urljoin("locations", ulc)
+        return self.__request(endpoint, "")
 
     def get_rooms(self,ulc):
         endpoint = urljoin("rooms")
