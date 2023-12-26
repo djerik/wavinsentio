@@ -2,7 +2,7 @@ import requests
 import time
 
 __title__ = "wavinsentio"
-__version__ = "0.3.1"
+__version__ = "0.4.1"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
@@ -12,7 +12,7 @@ BASEURL = 'https://wavin-api.jablotron.cloud/v2.6'
 class WavinSentio():
 
     """
-    Object containing Wavin Sentio's  API-methods.
+    Object containing Wavin Sentio's API-methods.
     """
 
     def __init__(self, username, password):
