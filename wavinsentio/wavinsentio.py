@@ -2,12 +2,12 @@ import requests
 import time
 
 __title__ = "wavinsentio"
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
 
-BASEURL = 'https://wavin-api.jablotron.cloud/v2.2'
+BASEURL = 'https://wavin-api.jablotron.cloud/v2.6'
 
 class WavinSentio():
 
