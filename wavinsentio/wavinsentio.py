@@ -32,13 +32,23 @@ class WavinSentio():
         self.password = password
         self.__login()
 
-    def get_devices(self):
-        plainText = self.__request("ListDevices", "")
+    def get_device(self):
         #This part is a workaround for the fact that the API returns a list of devices, 
         # but we only want the first one since we only support one device for now and most users will only have one device I guess.
-        device_data = plainText.json()["devices"][0]
+        device_data = self.__request("ListDevices", "").json()["devices"][0]
         device = Device(device_data)
         return device
+    
+    def get_rooms(self):
+        device = self.get_device()
+        return device.lastConfig.sentio.rooms
+    
+    def get_room(self, room_id):
+        rooms = self.get_rooms()
+        for room in rooms:
+            if room.id == room_id:
+                return room
+        raise ValueError(f"Room with id {room_id} not found.")
     
     def set_temperature(self, room_id, temperature):
         raise NotImplementedError("set_temperature method is not implemented yet.")
@@ -60,7 +70,9 @@ class WavinSentio():
     def __login(self):
         post_data = {"returnSecureToken":True,"email":self.email,"password":self.password,"clientType":"CLIENT_TYPE_WEB"}
         print(self.AUTHOURIZE_URL)
+        print("Post data:", post_data)
         response = requests.post(self.AUTHOURIZE_URL, data=post_data)
+        print("Statuscode:", response.status_code)
         if response.status_code == 401:
             raise UnauthorizedException( 'Wrong login' )
         if response.status_code != 200:
@@ -80,8 +92,7 @@ class WavinSentio():
         try:
             url = urljoin(self.DEVICESERVICE, endpoint )
             print(url)
-            auth = BearerAuth(self.idToken)
-            Response = requests.post(url,data='{}', headers={'Content-Type':'application/json'},params=params, auth=auth)
+            Response = requests.post(url,data='{}', headers={'Content-Type':'application/json'},params=params, auth=BearerAuth(self.idToken))
             print("Statuscode:", Response.status_code)
         except requests.exceptions.RequestException as e:
             print(f"An error occurred: {e}")
