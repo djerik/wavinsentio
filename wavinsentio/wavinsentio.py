@@ -1,13 +1,25 @@
 import requests
+from requests.auth import AuthBase
 import time
 
 __title__ = "wavinsentio"
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
-
-BASEURL = 'https://wavin-api.jablotron.cloud/v2.6'
+class Device:
+    def __init__(self, data):
+        self.name = data.get("name")
+        self.createTime = data.get("createTime")
+        self.updateTime = data.get("updateTime")
+        self.serialNumber = data.get("serialNumber")
+        self.registrationKey = data.get("registrationKey")
+        self.firmwareAvailable = data.get("firmwareAvailable")
+        self.firmwareInstalled = data.get("firmwareInstalled")
+        self.type = data.get("type")
+        self.lastHeartbeat = data.get("lastHeartbeat")
+        self.lastConfig = LastConfig(data.get("lastConfig"))
+        self.outdoorTemperature = data.get("outdoorTemperature")
 
 class WavinSentio():
 
@@ -15,71 +27,82 @@ class WavinSentio():
     Object containing Wavin Sentio's API-methods.
     """
 
-    def __init__(self, username, password):
-        self.username = username
+    AUTHOURIZE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyBlAtNI7-2jitPul9I-O4EZcT-n0sIay-g"
+    DEVICESERVICE = "https://blaze.wavinsentio.com/wavin.blaze.v1.BlazeDeviceService"
+
+
+    def __init__(self, email, password):
+        self.email = email
         self.password = password
         self.__login()
- 
-    def get_locations(self):           
-        return self.__request("locations", "")
-    
-    def get_location(self,ulc):
-        endpoint = urljoin("locations", ulc)
-        return self.__request(endpoint, "")
-
-    def get_rooms(self,ulc):
-        endpoint = urljoin("rooms")
-        params = { 'location': ulc }
-        return self.__request(endpoint, params)
 
     def set_temperature(self,code,temperature):
-        endpoint = urljoin("rooms",code)
-        payload = {"returnField": ["code"], "room": {"profile": "manual", "tempManual": temperature}}
-        return self.__patch(endpoint, payload)
+        raise Exception("Not implemented yet")
+        #endpoint = urljoin("rooms",code)
+        #payload = {"returnField": ["code"], "room": {"profile": "manual", "tempManual": temperature}}
+        #return self.__patch(endpoint, payload)
 
     def set_profile(self,code,profile):
-        endpoint = urljoin("rooms",code)
-        payload = {"returnField": ["code"], "room": {"profile": profile}}
-        return self.__patch(endpoint, payload)
+        raise Exception("Not implemented yet")
+        #endpoint = urljoin("rooms",code)
+        #payload = {"returnField": ["code"], "room": {"profile": profile}}
+        #return self.__patch(endpoint, payload)
 
     # private method for handling login
     def __login(self):
-        post_data = {"username":self.username,"password":self.password,"grant_type":"password"}
-        response = requests.post( urljoin( BASEURL, "oauth" ,"token" ),data=post_data
-                                ,headers={"Authorization": 'Basic YXBwOnNlY3JldA==','Content-Type':'application/x-www-form-urlencoded'})
-                        
+        post_data = {"returnSecureToken":True,"email":self.email,"password":self.password,"clientType":"CLIENT_TYPE_WEB"}
+        response = requests.post(self.AUTHOURIZE_URL, data=post_data)
         if response.status_code == 401:
             raise UnauthorizedException( 'Wrong login' )
         if response.status_code != 200:
             # This means something else went wrong.
             raise Exception('Error during login {}'.format(response.text))
-        
+
         data = response.json()
 
-        self.access_token = data["access_token"]
-        self.token_type = data["token_type"]
+        self.idToken = data["idToken"]
+        self.refreshToken = data["refreshToken"]
         self.access_token_expiration = time.time() + 3500
 
+    def get_devices(self):
+        devices_data = self.__request("ListDevices", "").json()["devices"]
+        devices = list()
+        for device_data in devices_data:
+            # Not migrated devices are not suppported
+            if("platform" not in device_data):
+                devices.append( Device(device_data))
+        return devices
+
+    def get_device(self,name) -> Device:
+        device_data = self.__request("GetDevice", "", {"name":name}).json()
+        return Device(device_data)
+
     # private method for requesting data from api
-    def __request(self, endpoint, params):
+    def __request(self, endpoint, params, body={}):
         if time.time() > self.access_token_expiration:
             self.__login()
-        
-        url = urljoin(BASEURL, endpoint )
+        try:
+            url = urljoin(self.DEVICESERVICE, endpoint )
+            Response = requests.post(url,json=body, headers={'Content-Type':'application/json'},params=params, auth=BearerAuth(self.idToken))
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            return requests.Response()
 
-        return requests.get(url, params, headers={"Authorization" : self.token_type + " " + self.access_token}).json()
+        return Response
 
     # private method for patching via api
     def __patch(self, endpoint, payload):
         if time.time() > self.access_token_expiration:
             self.__login()
-        
-        url = urljoin(BASEURL, endpoint )
 
-        response = requests.patch(url, json=payload, headers={"Authorization" : self.token_type + " " + self.access_token,'Content-Type':'application/json'})
-        
-        data = response.json()
-    
+        try:
+            url = urljoin(self.DEVICESERVICE, endpoint )
+            Response = requests.post(url,json=payload, headers={'Content-Type':'application/json'},params=params, auth=BearerAuth(self.idToken))
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            return requests.Response()
+
+        return Response
 
 def urljoin(*parts):
     """
@@ -107,3 +130,40 @@ def urljoin(*parts):
 
 class UnauthorizedException(Exception):
     pass
+
+class BearerAuth(AuthBase):
+    def __init__(self, token):
+        self.token = token
+
+    def __call__(self, r):
+        r.headers["Authorization"] = f"Bearer {self.token}"
+        return r
+
+class LastConfig:
+    def __init__(self, data):
+        self.name = data.get("name", "")
+        self.timestamp = data.get("timestamp")
+        self.sentio = Sentio(data.get("sentio"))
+
+class Sentio:
+    def __init__(self, data):
+        self.title = data.get("title", "")
+        self.titlePersonalized = data.get("titlePersonalized", "")
+        self.standbyMode = data.get("standbyMode", "")
+        self.rooms = [Room(r) for r in data.get("rooms")]
+
+class Room:
+    def __init__(self, data):
+        self.id = data.get("id", 0)
+        self.title = data.get("title", "")
+        self.titlePersonalized = data.get("titlePersonalized", "")
+        self.airTemperature = data.get("airTemperature", 0)
+        #TODO: Add support for floorTemperature
+        self.floorTemperature = data.get("floorTemperature", 0)
+        self.humidity = data.get("humidity", 0)
+        self.setpointTemperature = data.get("setpointTemperature", 0)
+        self.minSetpointTemperature = data.get("minSetpointTemperature", 0)
+        self.maxSetpointTemperature = data.get("maxSetpointTemperature", 0)
+        self.vacationMode = data.get("vacationMode")
+        self.lockMode = data.get("lockMode")
+        self.temperatureState = data.get("temperatureState")
