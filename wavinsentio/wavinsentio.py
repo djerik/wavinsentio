@@ -3,8 +3,7 @@ from wavinsentio.Device import Device
 from wavinsentio.Device import Room
 from requests.auth import AuthBase
 import time
-import secrets
-import string
+from datetime import datetime, timezone
 
 __title__ = "WavinSentio"
 __version__ = "0.4.1"
@@ -23,24 +22,37 @@ class WavinSentio():
     Object containing Wavin Sentio's API-methods.
     """
 
-    AUTHOURIZE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyBlAtNI7-2jitPul9I-O4EZcT-n0sIay-g"
-    DEVICESERVICE = "https://blaze.wavinsentio.com/wavin.blaze.v1.BlazeDeviceService"
-
+    auth_url = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyBlAtNI7-2jitPul9I-O4EZcT-n0sIay-g"
+    base_url = "https://blaze.wavinsentio.com/wavin.blaze.v1.BlazeDeviceService"
 
     def __init__(self, email, password):
         self.email = email
         self.password = password
         self.__login()
+        self.device_name = (self.get_devices()).name
 
-    def get_device(self):
+    
+    
+
+    def get_devices(self):
         #This part is a workaround for the fact that the API returns a list of devices, 
         # but we only want the first one since we only support one device for now and most users will only have one device I guess.
-        device_data = self.__request("ListDevices", "").json()["devices"][0]
+        body = {
+        }
+        device_data = self.__request("ListDevices", body).json()["devices"][0]
+        device = Device(device_data)
+        return device
+    
+    def get_device(self, device_name):
+        body = {
+            "name": device_name
+        }
+        device_data = self.__request("GetDevice", body).json()
         device = Device(device_data)
         return device
     
     def get_rooms(self):
-        device = self.get_device()
+        device = self.get_device(self.device_name)
         return device.lastConfig.sentio.rooms
     
     def get_room(self, room_id):
@@ -51,27 +63,75 @@ class WavinSentio():
         raise ValueError(f"Room with id {room_id} not found.")
     
     def set_temperature(self, room_id, temperature):
-        raise NotImplementedError("set_temperature method is not implemented yet.")
+        body = {
+                "device_name": self.device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "rooms": [
+                            {
+                                "id": room_id,
+                                "setpointTemperature": temperature
+                            }
+                        ]
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
     
     def increase_temperature(self, room_id):
-        raise NotImplementedError("increase_temperature method is not implemented yet.")
+        room_info = self.get_room(room_id)
+        self.set_temperature = room_info.setpointTemperature + 0.5
     
     def decrease_temperature(self, room_id):
-        raise NotImplementedError("decrease_temperature method is not implemented yet.")
+        room_info = self.get_room(room_id)
+        self.set_temperature = room_info.setpointTemperature - 0.5
     
     def set_lock_mode(self, room_id, lock_mode):
-        raise NotImplementedError("set_lock_mode method is not implemented yet.")
+        body = {
+                "device_name": self.device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "rooms": [
+                            {
+                                "id": room_id,
+                                "lockMode": lock_mode
+                            }
+                        ]
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
     
-    def set_vacation_mode(self, room_id, vacation_mode):
-        raise NotImplementedError("set_vacation_mode method is not implemented yet.")
-    
+    #def set_vacation_mode(self, vacation_mode):
+        
+        # all_rooms = self.get_rooms()
+        # ##create body with all rooms
+        # rooms = []
+        # for room in all_rooms:
+        #     rooms.append({
+        #         "id": room.id,
+        #         "vacationMode": vacation_mode
+        #     })
+        # ##create body
+        #     body = {
+        #         "device_name": self.device_name,
+        #         "config": {
+        #             "timestamp": get_utc_timestamp(),
+        #             "sentio": {
+        #                 "rooms": rooms
+        #             }
+        #         }
+        #     }
+        # self.__request("SendDeviceConfig", body)
 
     # private method for handling login
     def __login(self):
         post_data = {"returnSecureToken":True,"email":self.email,"password":self.password,"clientType":"CLIENT_TYPE_WEB"}
-        print(self.AUTHOURIZE_URL)
+        print(self.auth_url)
         print("Post data:", post_data)
-        response = requests.post(self.AUTHOURIZE_URL, data=post_data)
+        response = requests.post(self.auth_url, data=post_data)
         print("Statuscode:", response.status_code)
         if response.status_code == 401:
             raise UnauthorizedException( 'Wrong login' )
@@ -86,13 +146,19 @@ class WavinSentio():
         self.access_token_expiration = time.time() + 3500
 
     # private method for requesting data from api
-    def __request(self, endpoint, params) -> requests.Response:
+    def __request(self, endpoint, body) -> requests.Response:
         if time.time() > self.access_token_expiration:
             self.__login()
         try:
-            url = urljoin(self.DEVICESERVICE, endpoint )
-            print(url)
-            Response = requests.post(url,data='{}', headers={'Content-Type':'application/json'},params=params, auth=BearerAuth(self.idToken))
+            url = f"{self.base_url}/{endpoint}"
+            print("Request URL:", url)
+            headers = {
+            "Content-Type": "application/json"
+            }
+            print("Request Headers:", headers)
+            print("Request Body:", body)
+            Response = requests.post(url,headers=headers, json=body, auth=BearerAuth(self.idToken))
+
             print("Statuscode:", Response.status_code)
         except requests.exceptions.RequestException as e:
             print(f"An error occurred: {e}")
@@ -105,7 +171,7 @@ class WavinSentio():
         if time.time() > self.access_token_expiration:
             self.__login()
         
-        url = urljoin(self.AUTHOURIZE_URL, endpoint )
+        url = urljoin(self.auth_url, endpoint )
 
         response = requests.patch(url, json=payload, headers={"Authorization" : self.refreshToken + " " + self.idToken,'Content-Type':'application/json'})
         
@@ -146,6 +212,7 @@ class BearerAuth(AuthBase):
     def __call__(self, r):
         r.headers["Authorization"] = f"Bearer {self.token}"
         return r
-    
 
-
+def get_utc_timestamp():
+    now = datetime.now(timezone.utc)
+    return now.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
