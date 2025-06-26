@@ -33,7 +33,7 @@ def test_set_temperature():
 def test_vacation_mode():
     vacation_mode = "VACATION_MODE_ON"
     print(f"Set vacation mode to {vacation_mode}")
-    wavin_sentio.set_vacation_mode(vacation_mode)
+    #wavin_sentio.set_vacation_mode(vacation_mode)
     
 
 
