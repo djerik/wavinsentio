@@ -127,6 +127,8 @@ class WavinSentio():
         # self.__request("SendDeviceConfig", body)
 
     def set_HC_mode(self, hc_mode):
+        #Should work accoring to the GRPC API documentation but haven't tested it yet.
+        # hc_mode can be HC_MODE_HEATING, HC_MODE_COOLING or HC_MODE_UNSPECIFIED
         body = {
                 "device_name": self.device_name,
                 "config": {
