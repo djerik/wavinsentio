@@ -31,14 +31,15 @@ def test_set_temperature():
 
 
 def test_vacation_mode():
-    vacation_mode = "VACATION_MODE_ON"
+    # vacation_mode can be VACATION_MODE_UNSPECIFIED, VACATION_MODE_ON or VACATION_MODE_OFF
+    vacation_mode = "VACATION_MODE_OFF"
     print(f"Set vacation mode to {vacation_mode}")
-    #wavin_sentio.set_vacation_mode(vacation_mode)
-    
+    wavin_sentio.set_vacation_mode(vacation_mode)
+    assert wavin_sentio.get_device(wavin_sentio.device_name).lastConfig.sentio.rooms[0].vacationMode == vacation_mode, "Failed to set vacation mode"
+    print(f"Vacation mode is now {wavin_sentio.get_device(wavin_sentio.device_name).lastConfig.sentio.rooms[0].vacationMode}")
+# Run the tests
 
-
-
-test_login()
-test_get_devices()
-test_set_temperature()
+#test_login()
+#test_get_devices()
+#test_set_temperature()
 test_vacation_mode()

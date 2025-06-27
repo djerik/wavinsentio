@@ -96,6 +96,8 @@ class WavinSentio():
                         "rooms": [
                             {
                                 "id": room_id,
+                                # set the lock mode for the room
+                                # LOCK_MODE_UNSPECIFIED, LOCK_MODE_LOCKED, LOCK_MODE_UNLOCKED, LOCK_MODE_HOTEL
                                 "lockMode": lock_mode
                             }
                         ]
@@ -104,27 +106,20 @@ class WavinSentio():
             }
         self.__request("SendDeviceConfig", body)
     
-    #def set_vacation_mode(self, vacation_mode):
-        
-        # all_rooms = self.get_rooms()
-        # ##create body with all rooms
-        # rooms = []
-        # for room in all_rooms:
-        #     rooms.append({
-        #         "id": room.id,
-        #         "vacationMode": vacation_mode
-        #     })
-        # ##create body
-        #     body = {
-        #         "device_name": self.device_name,
-        #         "config": {
-        #             "timestamp": get_utc_timestamp(),
-        #             "sentio": {
-        #                 "rooms": rooms
-        #             }
-        #         }
-        #     }
-        # self.__request("SendDeviceConfig", body)
+    def set_vacation_mode(self, vacation_mode):
+        body = {
+                "device_name": self.device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "vacationSettings": {
+                            # vacation_mode can be VACATION_MODE_UNSPECIFIED, VACATION_MODE_ON or VACATION_MODE_OFF
+                            "vacationMode": vacation_mode
+                        },
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
 
     def set_HC_mode(self, hc_mode):
         #Should work accoring to the GRPC API documentation but haven't tested it yet.
@@ -134,7 +129,6 @@ class WavinSentio():
                 "config": {
                     "timestamp": get_utc_timestamp(),
                     "sentio": {
-                        "rooms": [],
                         "hcMode": hc_mode
                     }
                 }
