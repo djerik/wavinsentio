@@ -126,7 +126,7 @@ class WavinSentio():
         #     }
         # self.__request("SendDeviceConfig", body)
 
-    def set_HC_mode(self, room_id, hc_mode):
+    def set_HC_mode(self, hc_mode):
         body = {
                 "device_name": self.device_name,
                 "config": {
