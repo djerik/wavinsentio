@@ -126,6 +126,19 @@ class WavinSentio():
         #     }
         # self.__request("SendDeviceConfig", body)
 
+    def set_HC_mode(self, room_id, hc_mode):
+        body = {
+                "device_name": self.device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "rooms": [],
+                        "hcMode": hc_mode
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
+
     # private method for handling login
     def __login(self):
         post_data = {"returnSecureToken":True,"email":self.email,"password":self.password,"clientType":"CLIENT_TYPE_WEB"}

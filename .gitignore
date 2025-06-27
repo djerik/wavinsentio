@@ -37,3 +37,8 @@ nosetests.xml
 
 # Mac OS
 .DS_Store
+# PyCharm
+.idea
+*.iml
+# VS Code
+.vscodexx
