@@ -1,11 +1,32 @@
+from typing import List
 import requests
 from requests.auth import AuthBase
 import time
+from datetime import datetime, timezone
 
 __title__ = "wavinsentio"
 __version__ = "0.5.0"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
+
+from enum import Enum
+
+class VacationMode(Enum):
+    VACATION_MODE_UNSPECIFIED = "VACATION_MODE_UNSPECIFIED"
+    VACATION_MODE_ON = "VACATION_MODE_ON"
+    VACATION_MODE_OFF = "VACATION_MODE_OFF"
+
+class LockMode(Enum):
+    LOCK_MODE_UNSPECIFIED = "LOCK_MODE_UNSPECIFIED"
+    LOCK_MODE_LOCKED = "LOCK_MODE_LOCKED"
+    LOCK_MODE_UNLOCKED = "LOCK_MODE_UNLOCKED"
+    LOCK_MODE_HOTEL = "LOCK_MODE_HOTEL"
+
+class HCMode(Enum):
+    HC_MODE_UNSPECIFIED = "HC_MODE_UNSPECIFIED"
+    HC_MODE_HEATING = "HC_MODE_HEATING"
+    HC_MODE_COOLING  = "HC_MODE_COOLING"
+
 
 class Device:
     def __init__(self, data):
@@ -36,11 +57,65 @@ class WavinSentio():
         self.password = password
         self.__login()
 
-    def set_temperature(self,code,temperature):
-        raise Exception("Not implemented yet")
-        #endpoint = urljoin("rooms",code)
-        #payload = {"returnField": ["code"], "room": {"profile": "manual", "tempManual": temperature}}
-        #return self.__patch(endpoint, payload)
+    def set_temperature(self, device_name, room_id, temperature):
+        body = {
+                "device_name": device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "rooms": [
+                            {
+                                "id": room_id,
+                                "setpointTemperature": temperature
+                            }
+                        ]
+                    }
+                }
+            }
+        self.__request("    ", body)
+
+    def set_lock_mode(self, device_name, room_id, lock_mode):
+        body = {
+                "device_name": device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "rooms": [
+                            {
+                                "id": room_id,
+                                "lockMode": lock_mode
+                            }
+                        ]
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
+
+    def set_HC_mode(self, device_name, hc_mode):
+        body = {
+                "device_name": device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "hcMode": hc_mode
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)     
+    
+    def set_vacation_mode(self, device_name, vacation_mode : VacationMode):
+        body = {
+                "device_name": device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "vacationSettings": {
+                            "vacationMode": vacation_mode
+                        },
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
 
     def set_profile(self,code,profile):
         raise Exception("Not implemented yet")
@@ -64,7 +139,7 @@ class WavinSentio():
         self.refreshToken = data["refreshToken"]
         self.access_token_expiration = time.time() + 3500
 
-    def get_devices(self):
+    def get_devices(self) -> List[Device]:
         devices_data = self.__request("ListDevices", "").json()["devices"]
         devices = list()
         for device_data in devices_data:
@@ -73,9 +148,13 @@ class WavinSentio():
                 devices.append( Device(device_data))
         return devices
 
-    def get_device(self,name) -> Device:
-        device_data = self.__request("GetDevice", "", {"name":name}).json()
+    def get_device(self,device_name) -> Device:
+        device_data = self.__request("GetDevice", "", {"name":device_name}).json()
         return Device(device_data)
+
+    def get_rooms(self, device_name):
+        device = self.get_device(device_name)
+        return device.lastConfig.sentio.rooms
 
     # private method for requesting data from api
     def __request(self, endpoint, params, body={}):
@@ -150,6 +229,7 @@ class Sentio:
         self.title = data.get("title", "")
         self.titlePersonalized = data.get("titlePersonalized", "")
         self.standbyMode = data.get("standbyMode", "")
+        self.hcMode = (HCMode)(data.get("hcMode", ""))
         self.rooms = [Room(r) for r in data.get("rooms")]
 
 class Room:
@@ -164,6 +244,10 @@ class Room:
         self.setpointTemperature = data.get("setpointTemperature", 0)
         self.minSetpointTemperature = data.get("minSetpointTemperature", 0)
         self.maxSetpointTemperature = data.get("maxSetpointTemperature", 0)
-        self.vacationMode = data.get("vacationMode")
-        self.lockMode = data.get("lockMode")
+        self.vacationMode = (VacationMode)(data.get("vacationMode"))
+        self.lockMode = (LockMode)(data.get("lockMode"))
         self.temperatureState = data.get("temperatureState")
+
+def get_utc_timestamp():
+    now = datetime.now(timezone.utc)
+    return now.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
