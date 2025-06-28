@@ -34,3 +34,11 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+# Mac OS
+.DS_Store
+# PyCharm
+.idea
+*.iml
+# VS Code
+.vscodexx

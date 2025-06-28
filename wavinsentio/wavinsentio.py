@@ -1,53 +1,147 @@
 import requests
+from wavinsentio.Device import Device
+from wavinsentio.Device import Room
+from requests.auth import AuthBase
 import time
+from datetime import datetime, timezone
 
-__title__ = "wavinsentio"
+__title__ = "WavinSentio"
 __version__ = "0.4.1"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
+##Old API URL
+##BASEURL = 'https://wavin-api.jablotron.cloud/v2.6'
 
-BASEURL = 'https://wavin-api.jablotron.cloud/v2.6'
+
+
 
 class WavinSentio():
-
+    
     """
     Object containing Wavin Sentio's API-methods.
     """
 
-    def __init__(self, username, password):
-        self.username = username
+    auth_url = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyBlAtNI7-2jitPul9I-O4EZcT-n0sIay-g"
+    base_url = "https://blaze.wavinsentio.com/wavin.blaze.v1.BlazeDeviceService"
+
+    def __init__(self, email, password):
+        self.email = email
         self.password = password
         self.__login()
- 
-    def get_locations(self):           
-        return self.__request("locations", "")
+        self.device_name = (self.get_devices()).name
+
     
-    def get_location(self,ulc):
-        endpoint = urljoin("locations", ulc)
-        return self.__request(endpoint, "")
+    
 
-    def get_rooms(self,ulc):
-        endpoint = urljoin("rooms")
-        params = { 'location': ulc }
-        return self.__request(endpoint, params)
+    def get_devices(self):
+        #This part is a workaround for the fact that the API returns a list of devices, 
+        # but we only want the first one since we only support one device for now and most users will only have one device I guess.
+        body = {
+        }
+        device_data = self.__request("ListDevices", body).json()["devices"][0]
+        device = Device(device_data)
+        return device
+    
+    def get_device(self, device_name):
+        body = {
+            "name": device_name
+        }
+        device_data = self.__request("GetDevice", body).json()
+        device = Device(device_data)
+        return device
+    
+    def get_rooms(self):
+        device = self.get_device(self.device_name)
+        return device.lastConfig.sentio.rooms
+    
+    def get_room(self, room_id):
+        rooms = self.get_rooms()
+        for room in rooms:
+            if room.id == room_id:
+                return room
+        raise ValueError(f"Room with id {room_id} not found.")
+    
+    def set_temperature(self, room_id, temperature):
+        body = {
+                "device_name": self.device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "rooms": [
+                            {
+                                "id": room_id,
+                                "setpointTemperature": temperature
+                            }
+                        ]
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
+    
+    def increase_temperature(self, room_id):
+        room_info = self.get_room(room_id)
+        self.set_temperature = room_info.setpointTemperature + 0.5
+    
+    def decrease_temperature(self, room_id):
+        room_info = self.get_room(room_id)
+        self.set_temperature = room_info.setpointTemperature - 0.5
+    
+    def set_lock_mode(self, room_id, lock_mode):
+        body = {
+                "device_name": self.device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "rooms": [
+                            {
+                                "id": room_id,
+                                # set the lock mode for the room
+                                # LOCK_MODE_UNSPECIFIED, LOCK_MODE_LOCKED, LOCK_MODE_UNLOCKED, LOCK_MODE_HOTEL
+                                "lockMode": lock_mode
+                            }
+                        ]
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
+    
+    def set_vacation_mode(self, vacation_mode):
+        body = {
+                "device_name": self.device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "vacationSettings": {
+                            # vacation_mode can be VACATION_MODE_UNSPECIFIED, VACATION_MODE_ON or VACATION_MODE_OFF
+                            "vacationMode": vacation_mode
+                        },
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
 
-    def set_temperature(self,code,temperature):
-        endpoint = urljoin("rooms",code)
-        payload = {"returnField": ["code"], "room": {"profile": "manual", "tempManual": temperature}}
-        return self.__patch(endpoint, payload)
-
-    def set_profile(self,code,profile):
-        endpoint = urljoin("rooms",code)
-        payload = {"returnField": ["code"], "room": {"profile": profile}}
-        return self.__patch(endpoint, payload)
+    def set_HC_mode(self, hc_mode):
+        #Should work accoring to the GRPC API documentation but haven't tested it yet.
+        # hc_mode can be HC_MODE_HEATING, HC_MODE_COOLING or HC_MODE_UNSPECIFIED
+        body = {
+                "device_name": self.device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "hcMode": hc_mode
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", body)
 
     # private method for handling login
     def __login(self):
-        post_data = {"username":self.username,"password":self.password,"grant_type":"password"}
-        response = requests.post( urljoin( BASEURL, "oauth" ,"token" ),data=post_data
-                                ,headers={"Authorization": 'Basic YXBwOnNlY3JldA==','Content-Type':'application/x-www-form-urlencoded'})
-                        
+        post_data = {"returnSecureToken":True,"email":self.email,"password":self.password,"clientType":"CLIENT_TYPE_WEB"}
+        print(self.auth_url)
+        print("Post data:", post_data)
+        response = requests.post(self.auth_url, data=post_data)
+        print("Statuscode:", response.status_code)
         if response.status_code == 401:
             raise UnauthorizedException( 'Wrong login' )
         if response.status_code != 200:
@@ -56,27 +150,39 @@ class WavinSentio():
         
         data = response.json()
 
-        self.access_token = data["access_token"]
-        self.token_type = data["token_type"]
+        self.idToken = data["idToken"]
+        self.refreshToken = data["refreshToken"]
         self.access_token_expiration = time.time() + 3500
 
     # private method for requesting data from api
-    def __request(self, endpoint, params):
+    def __request(self, endpoint, body) -> requests.Response:
         if time.time() > self.access_token_expiration:
             self.__login()
-        
-        url = urljoin(BASEURL, endpoint )
+        try:
+            url = f"{self.base_url}/{endpoint}"
+            print("Request URL:", url)
+            headers = {
+            "Content-Type": "application/json"
+            }
+            print("Request Headers:", headers)
+            print("Request Body:", body)
+            Response = requests.post(url,headers=headers, json=body, auth=BearerAuth(self.idToken))
 
-        return requests.get(url, params, headers={"Authorization" : self.token_type + " " + self.access_token}).json()
+            print("Statuscode:", Response.status_code)
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            return requests.Response()
+
+        return Response
 
     # private method for patching via api
     def __patch(self, endpoint, payload):
         if time.time() > self.access_token_expiration:
             self.__login()
         
-        url = urljoin(BASEURL, endpoint )
+        url = urljoin(self.auth_url, endpoint )
 
-        response = requests.patch(url, json=payload, headers={"Authorization" : self.token_type + " " + self.access_token,'Content-Type':'application/json'})
+        response = requests.patch(url, json=payload, headers={"Authorization" : self.refreshToken + " " + self.idToken,'Content-Type':'application/json'})
         
         data = response.json()
     
@@ -107,3 +213,15 @@ def urljoin(*parts):
 
 class UnauthorizedException(Exception):
     pass
+
+class BearerAuth(AuthBase):
+    def __init__(self, token):
+        self.token = token
+
+    def __call__(self, r):
+        r.headers["Authorization"] = f"Bearer {self.token}"
+        return r
+
+def get_utc_timestamp():
+    now = datetime.now(timezone.utc)
+    return now.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
