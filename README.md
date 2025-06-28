@@ -22,4 +22,6 @@ ws = wavinsentio.WavinSentio("username","password")
 * 0.3.0
     * Added get_location including outdoor temperature
 * 0.4.1
-    * Changed base URL for Wavin Sentio service    
+    * Changed base URL for Wavin Sentio service
+* 0.5.0
+    * Àdded support for new Sentio v18 firmware
