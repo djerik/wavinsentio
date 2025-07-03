@@ -25,3 +25,5 @@ ws = wavinsentio.WavinSentio("username","password")
     * Changed base URL for Wavin Sentio service
 * 0.5.0
     * Àdded support for new Sentio v18 firmware
+* 0.5.1
+    * Fix StandbyMode and other small fixes

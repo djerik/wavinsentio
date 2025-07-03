@@ -27,6 +27,10 @@ class HCMode(Enum):
     HC_MODE_HEATING = "HC_MODE_HEATING"
     HC_MODE_COOLING  = "HC_MODE_COOLING"
 
+class StandbyMode(Enum):
+    STANDBY_MODE_UNSPECIFIED = "STANDBY_MODE_UNSPECIFIED"
+    STANDBY_MODE_ON = "STANDBY_MODE_ON"
+    STANDBY_MODE_OFF = "STANDBY_MODE_OFF"
 
 class Device:
     def __init__(self, data):
@@ -72,7 +76,7 @@ class WavinSentio():
                     }
                 }
             }
-        self.__request("    ", body)
+        self.__request("SendDeviceConfig", "", body)
 
     def set_lock_mode(self, device_name, room_id, lock_mode):
         body = {
@@ -83,13 +87,13 @@ class WavinSentio():
                         "rooms": [
                             {
                                 "id": room_id,
-                                "lockMode": lock_mode
+                                "lockMode": lock_mode.value
                             }
                         ]
                     }
                 }
             }
-        self.__request("SendDeviceConfig", body)
+        self.__request("SendDeviceConfig", "", body)
 
     def set_HC_mode(self, device_name, hc_mode):
         body = {
@@ -101,8 +105,8 @@ class WavinSentio():
                     }
                 }
             }
-        self.__request("SendDeviceConfig", body)     
-    
+        self.__request("SendDeviceConfig", "", body)
+
     def set_vacation_mode(self, device_name, vacation_mode : VacationMode):
         body = {
                 "device_name": device_name,
@@ -110,12 +114,24 @@ class WavinSentio():
                     "timestamp": get_utc_timestamp(),
                     "sentio": {
                         "vacationSettings": {
-                            "vacationMode": vacation_mode
+                            "vacationMode": vacation_mode.value
                         },
                     }
                 }
             }
-        self.__request("SendDeviceConfig", body)
+        self.__request("SendDeviceConfig", "", body)
+
+    def set_standby_mode(self, device_name, standby_mode : StandbyMode ):
+        body = {
+                "device_name": device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "standbyMode": standby_mode.value
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", "", body)
 
     def set_profile(self,code,profile):
         raise Exception("Not implemented yet")
@@ -169,20 +185,6 @@ class WavinSentio():
 
         return Response
 
-    # private method for patching via api
-    def __patch(self, endpoint, payload):
-        if time.time() > self.access_token_expiration:
-            self.__login()
-
-        try:
-            url = urljoin(self.DEVICESERVICE, endpoint )
-            Response = requests.post(url,json=payload, headers={'Content-Type':'application/json'},params=params, auth=BearerAuth(self.idToken))
-        except requests.exceptions.RequestException as e:
-            print(f"An error occurred: {e}")
-            return requests.Response()
-
-        return Response
-
 def urljoin(*parts):
     """
     Join terms together with forward slashes
@@ -228,7 +230,7 @@ class Sentio:
     def __init__(self, data):
         self.title = data.get("title", "")
         self.titlePersonalized = data.get("titlePersonalized", "")
-        self.standbyMode = data.get("standbyMode", "")
+        self.standbyMode = (StandbyMode)(data.get("standbyMode", ""))
         self.hcMode = (HCMode)(data.get("hcMode", ""))
         self.rooms = [Room(r) for r in data.get("rooms")]
 
