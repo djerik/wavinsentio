@@ -27,3 +27,5 @@ ws = wavinsentio.WavinSentio("username","password")
     * Àdded support for new Sentio v18 firmware
 * 0.5.1
     * Fix StandbyMode and other small fixes
+* 0.5.2
+    * Added outdoor temperature and other small fixes

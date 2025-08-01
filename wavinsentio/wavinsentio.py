@@ -1,3 +1,4 @@
+
 from typing import List
 import requests
 from requests.auth import AuthBase
@@ -5,7 +6,7 @@ import time
 from datetime import datetime, timezone
 
 __title__ = "wavinsentio"
-__version__ = "0.5.0"
+__version__ = "0.5.2"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
@@ -32,6 +33,11 @@ class StandbyMode(Enum):
     STANDBY_MODE_ON = "STANDBY_MODE_ON"
     STANDBY_MODE_OFF = "STANDBY_MODE_OFF"
 
+class OutdoorTemperatureSensor:
+    def __init__(self, data):
+        self.id = data.get("id")
+        self.outdoorTemperature = data.get("outdoorTemperature")
+
 class Device:
     def __init__(self, data):
         self.name = data.get("name")
@@ -44,7 +50,6 @@ class Device:
         self.type = data.get("type")
         self.lastHeartbeat = data.get("lastHeartbeat")
         self.lastConfig = LastConfig(data.get("lastConfig"))
-        self.outdoorTemperature = data.get("outdoorTemperature")
 
 class WavinSentio():
 
@@ -116,6 +121,37 @@ class WavinSentio():
                         "vacationSettings": {
                             "vacationMode": vacation_mode.value
                         },
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", "", body)
+
+    def set_vacation_mode_until(self, device_name, vacation_mode_until : datetime):
+        body = {
+                "device_name": device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "vacationSettings": {
+                            "vacationModeUntil": vacation_mode_until.isoformat().replace('+00:00', 'Z')
+                        },
+                    }
+                }
+            }
+        self.__request("SendDeviceConfig", "", body)
+
+    def set_vacation_mode_room(self, device_name, room_id, vacation_mode : VacationMode):
+        body = {
+                "device_name": device_name,
+                "config": {
+                    "timestamp": get_utc_timestamp(),
+                    "sentio": {
+                        "rooms": [
+                            {
+                                "id": room_id,
+                                "vacationMode": vacation_mode.value
+                            }
+                        ]
                     }
                 }
             }
@@ -231,8 +267,19 @@ class Sentio:
         self.title = data.get("title", "")
         self.titlePersonalized = data.get("titlePersonalized", "")
         self.standbyMode = (StandbyMode)(data.get("standbyMode", ""))
+        self.vacationSettings = VacationSettings(data.get("vacationSettings"))
         self.hcMode = (HCMode)(data.get("hcMode", ""))
+        self.availableHcModes = data.get("availableHcModes")
         self.rooms = [Room(r) for r in data.get("rooms")]
+        if data.get("outdoorTemperatureSensors"):
+            self.outdoorTemperatureSensors = [OutdoorTemperatureSensor(o) for o in data.get("outdoorTemperatureSensors")]
+        else:
+            self.outdoorTemperatureSensors = []
+
+class VacationSettings:
+    def __init__(self, data):
+        self.vacationMode = (VacationMode)(data.get("vacationMode", ""))
+        self.vacationModeUntil = datetime.fromisoformat(data.get("vacationModeUntil", ""))
 
 class Room:
     def __init__(self, data):
@@ -240,7 +287,6 @@ class Room:
         self.title = data.get("title", "")
         self.titlePersonalized = data.get("titlePersonalized", "")
         self.airTemperature = data.get("airTemperature", 0)
-        #TODO: Add support for floorTemperature
         self.floorTemperature = data.get("floorTemperature", 0)
         self.humidity = data.get("humidity", 0)
         self.setpointTemperature = data.get("setpointTemperature", 0)
@@ -249,6 +295,15 @@ class Room:
         self.vacationMode = (VacationMode)(data.get("vacationMode"))
         self.lockMode = (LockMode)(data.get("lockMode"))
         self.temperatureState = data.get("temperatureState")
+        self.temperaturePresets = [TemperaturePreset(p) for p in data.get("temperaturePresets", [])]
+
+class TemperaturePreset:
+    def __init__(self, data):
+        self.type = (str)(data.get("type", ""))
+        self.hcMode = (str)(data.get("hcMode", ""))
+        self.setpointTemperature = (int)(data.get("setpointTemperature", 0))
+        self.minSetpointTemperature = (int)(data.get("minSetpointTemperature", 0))
+        self.maxSetpointTemperature = (int)(data.get("maxSetpointTemperature", 0))
 
 def get_utc_timestamp():
     now = datetime.now(timezone.utc)
