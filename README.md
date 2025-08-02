@@ -29,3 +29,5 @@ ws = wavinsentio.WavinSentio("username","password")
     * Fix StandbyMode and other small fixes
 * 0.5.2
     * Added outdoor temperature and other small fixes
+* 0.5.3
+    * Fix for empty vacationModeUntili
