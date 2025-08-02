@@ -3,10 +3,10 @@ from typing import List
 import requests
 from requests.auth import AuthBase
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 __title__ = "wavinsentio"
-__version__ = "0.5.2"
+__version__ = "0.5.3"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
@@ -279,7 +279,12 @@ class Sentio:
 class VacationSettings:
     def __init__(self, data):
         self.vacationMode = (VacationMode)(data.get("vacationMode", ""))
-        self.vacationModeUntil = datetime.fromisoformat(data.get("vacationModeUntil", ""))
+        # Workaround for empty value if vacation settings have never been used
+        # Sentio App adds one month to current time as default
+        if data.get("vacationModeUntil", "") == "":
+            self.vacationModeUntil = datetime.now + timedelta(days=30)
+        else:
+            self.vacationModeUntil = datetime.fromisoformat(data.get("vacationModeUntil", ""))
 
 class Room:
     def __init__(self, data):
