@@ -30,4 +30,8 @@ ws = wavinsentio.WavinSentio("username","password")
 * 0.5.2
     * Added outdoor temperature and other small fixes
 * 0.5.3
-    * Fix for empty vacationModeUntili
+    * Fix for empty vacationModeUntil
+* 0.5.4
+    * Fix typo in 0.5.3
+* 0.5.5
+    * Fix timezone bug

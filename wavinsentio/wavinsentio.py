@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 __title__ = "wavinsentio"
-__version__ = "0.5.3"
+__version__ = "0.5.5"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
@@ -282,7 +282,7 @@ class VacationSettings:
         # Workaround for empty value if vacation settings have never been used
         # Sentio App adds one month to current time as default
         if data.get("vacationModeUntil", "") == "":
-            self.vacationModeUntil = datetime.now + timedelta(days=30)
+            self.vacationModeUntil = datetime.now(timezone.utc) + timedelta(days=30)
         else:
             self.vacationModeUntil = datetime.fromisoformat(data.get("vacationModeUntil", ""))
 
