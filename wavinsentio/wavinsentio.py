@@ -6,11 +6,23 @@ import time
 from datetime import datetime, timedelta, timezone
 
 __title__ = "wavinsentio"
-__version__ = "0.5.5"
+__version__ = "0.5.6"
 __author__ = "Tobias Laursen"
 __license__ = "MIT"
 
 from enum import Enum
+
+# Seconds to wait for the cloud before giving up on a call
+REQUEST_TIMEOUT = 30
+
+# The login service answers wrong credentials with HTTP 400 and one of these messages
+INVALID_LOGIN_REASONS = (
+    "INVALID_LOGIN_CREDENTIALS",
+    "INVALID_PASSWORD",
+    "INVALID_EMAIL",
+    "EMAIL_NOT_FOUND",
+    "USER_DISABLED",
+)
 
 class VacationMode(Enum):
     VACATION_MODE_UNSPECIFIED = "VACATION_MODE_UNSPECIFIED"
@@ -33,6 +45,17 @@ class StandbyMode(Enum):
     STANDBY_MODE_ON = "STANDBY_MODE_ON"
     STANDBY_MODE_OFF = "STANDBY_MODE_OFF"
 
+def _to_enum(enum_cls, value):
+    """Convert an API value to an enum member.
+
+    Devices that have never reported a full configuration leave fields out,
+    so missing or unknown values map to the *_UNSPECIFIED member.
+    """
+    try:
+        return enum_cls(value)
+    except ValueError:
+        return next(m for m in enum_cls if m.name.endswith("_UNSPECIFIED"))
+
 class OutdoorTemperatureSensor:
     def __init__(self, data):
         self.id = data.get("id")
@@ -49,7 +72,7 @@ class Device:
         self.firmwareInstalled = data.get("firmwareInstalled")
         self.type = data.get("type")
         self.lastHeartbeat = data.get("lastHeartbeat")
-        self.lastConfig = LastConfig(data.get("lastConfig"))
+        self.lastConfig = LastConfig(data.get("lastConfig") or {})
 
 class WavinSentio():
 
@@ -178,12 +201,17 @@ class WavinSentio():
     # private method for handling login
     def __login(self):
         post_data = {"returnSecureToken":True,"email":self.email,"password":self.password,"clientType":"CLIENT_TYPE_WEB"}
-        response = requests.post(self.AUTHOURIZE_URL, data=post_data)
-        if response.status_code == 401:
+        try:
+            response = requests.post(self.AUTHOURIZE_URL, data=post_data, timeout=REQUEST_TIMEOUT)
+        except requests.exceptions.RequestException as e:
+            raise WavinSentioException('Error during login: {}'.format(e)) from e
+        if response.status_code == 401 or (
+            response.status_code == 400 and any(reason in response.text for reason in INVALID_LOGIN_REASONS)
+        ):
             raise UnauthorizedException( 'Wrong login' )
         if response.status_code != 200:
             # This means something else went wrong.
-            raise Exception('Error during login {}'.format(response.text))
+            raise WavinSentioException('Error during login {}'.format(response.text))
 
         data = response.json()
 
@@ -214,10 +242,14 @@ class WavinSentio():
             self.__login()
         try:
             url = urljoin(self.DEVICESERVICE, endpoint )
-            Response = requests.post(url,json=body, headers={'Content-Type':'application/json'},params=params, auth=BearerAuth(self.idToken))
+            Response = requests.post(url,json=body, headers={'Content-Type':'application/json'},params=params, auth=BearerAuth(self.idToken), timeout=REQUEST_TIMEOUT)
         except requests.exceptions.RequestException as e:
-            print(f"An error occurred: {e}")
-            return requests.Response()
+            raise WavinSentioException('Error calling {}: {}'.format(endpoint, e)) from e
+
+        if Response.status_code in (401, 403):
+            raise UnauthorizedException('Not authorized to call {}'.format(endpoint))
+        if not Response.ok:
+            raise WavinSentioException('Error calling {}: HTTP {} {}'.format(endpoint, Response.status_code, Response.text[:500]))
 
         return Response
 
@@ -245,8 +277,11 @@ def urljoin(*parts):
     url = '/'.join(part_list)
     return url
 
-class UnauthorizedException(Exception):
-    pass
+class WavinSentioException(Exception):
+    """Raised when a call to the Wavin Sentio cloud fails."""
+
+class UnauthorizedException(WavinSentioException):
+    """Raised when the login is wrong or no longer accepted."""
 
 class BearerAuth(AuthBase):
     def __init__(self, token):
@@ -260,17 +295,17 @@ class LastConfig:
     def __init__(self, data):
         self.name = data.get("name", "")
         self.timestamp = data.get("timestamp")
-        self.sentio = Sentio(data.get("sentio"))
+        self.sentio = Sentio(data.get("sentio") or {})
 
 class Sentio:
     def __init__(self, data):
         self.title = data.get("title", "")
         self.titlePersonalized = data.get("titlePersonalized", "")
-        self.standbyMode = (StandbyMode)(data.get("standbyMode", ""))
-        self.vacationSettings = VacationSettings(data.get("vacationSettings"))
-        self.hcMode = (HCMode)(data.get("hcMode", ""))
-        self.availableHcModes = data.get("availableHcModes")
-        self.rooms = [Room(r) for r in data.get("rooms")]
+        self.standbyMode = _to_enum(StandbyMode, data.get("standbyMode"))
+        self.vacationSettings = VacationSettings(data.get("vacationSettings") or {})
+        self.hcMode = _to_enum(HCMode, data.get("hcMode"))
+        self.availableHcModes = data.get("availableHcModes") or []
+        self.rooms = [Room(r) for r in data.get("rooms") or []]
         if data.get("outdoorTemperatureSensors"):
             self.outdoorTemperatureSensors = [OutdoorTemperatureSensor(o) for o in data.get("outdoorTemperatureSensors")]
         else:
@@ -278,7 +313,7 @@ class Sentio:
 
 class VacationSettings:
     def __init__(self, data):
-        self.vacationMode = (VacationMode)(data.get("vacationMode", ""))
+        self.vacationMode = _to_enum(VacationMode, data.get("vacationMode"))
         # Workaround for empty value if vacation settings have never been used
         # Sentio App adds one month to current time as default
         if data.get("vacationModeUntil", "") == "":
@@ -297,10 +332,20 @@ class Room:
         self.setpointTemperature = data.get("setpointTemperature", 0)
         self.minSetpointTemperature = data.get("minSetpointTemperature", 0)
         self.maxSetpointTemperature = data.get("maxSetpointTemperature", 0)
-        self.vacationMode = (VacationMode)(data.get("vacationMode"))
-        self.lockMode = (LockMode)(data.get("lockMode"))
+        self.vacationMode = _to_enum(VacationMode, data.get("vacationMode"))
+        self.lockMode = _to_enum(LockMode, data.get("lockMode"))
         self.temperatureState = data.get("temperatureState")
+        self.dehumidifierState = data.get("dehumidifierState")
+        self.notifications = [Notification(n) for n in data.get("notifications") or []]
         self.temperaturePresets = [TemperaturePreset(p) for p in data.get("temperaturePresets", [])]
+
+class Notification:
+    """A notification the controller currently reports, e.g. KEY_ROOM_PERIPHERAL_LOW_BATTERY."""
+    def __init__(self, data):
+        self.id = data.get("id", "")
+        self.timestamp = data.get("timestamp")
+        self.severity = data.get("severity", "")
+        self.key = data.get("key", "")
 
 class TemperaturePreset:
     def __init__(self, data):
